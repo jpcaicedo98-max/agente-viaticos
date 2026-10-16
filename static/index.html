@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asistente de viáticos</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 16'%3E%3Cpath d='M6 0l6 8-6 8-6-8z' fill='%239B1C1F'/%3E%3C/svg%3E">
+<style>
+@font-face { font-family: "Cinzel"; src: url("/static/fuentes/cinzel-latin-600-normal.ttf"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("/static/fuentes/inter-latin-400-normal.ttf"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("/static/fuentes/inter-latin-500-normal.ttf"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("/static/fuentes/inter-latin-600-normal.ttf"); font-weight: 600; font-display: swap; }
+
+:root {
+  --obsidiana: #141414;
+  --marfil: #F4EFE6;
+  --rojo: #9B1C1F;
+  --piedra: #5A5650;
+  --filete: rgba(20, 20, 20, 0.14);
+  --marfil-claro: rgba(255, 255, 255, 0.45);
+  --ancho: 760px;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--marfil);
+  color: var(--obsidiana);
+  font: 400 15px/1.5 "Inter", system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- Encabezado ---------- */
+.encabezado {
+  flex: none;
+  border-bottom: 2px solid var(--rojo);
+}
+.encabezado-interior {
+  max-width: var(--ancho);
+  margin: 0 auto;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.titulo-app {
+  font: 600 20px/1.2 "Cinzel", serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0;
+  padding: 10px 0;
+}
+
+.etiqueta {
+  font: 600 11px/1 "Inter", sans-serif;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+}
+.boton-texto {
+  background: none;
+  border: 1px solid var(--obsidiana);
+  color: var(--obsidiana);
+  padding: 10px 14px;
+  border-radius: 2px;
+  cursor: pointer;
+  font: 600 11px/1 "Inter", sans-serif;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.boton-texto:hover { background: var(--obsidiana); color: var(--marfil); }
+
+:focus-visible { outline: 2px solid var(--rojo); outline-offset: 2px; }
+
+/* ---------- Conversación ---------- */
+.conversacion { flex: 1; overflow-y: auto; }
+.conversacion-interior {
+  max-width: var(--ancho);
+  margin: 0 auto;
+  padding: 32px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 100%;
+}
+
+.bienvenida { margin: auto 0; padding: 24px 0; }
+.bienvenida h1 {
+  font: 600 32px/1.2 "Cinzel", serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0 0 12px;
+}
+.bienvenida .lema { font-weight: 600; font-size: 20px; line-height: 1.3; margin: 0 0 8px; }
+.bienvenida p { color: var(--piedra); margin: 0 0 24px; max-width: 52ch; }
+.sugerencias { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.sugerencia {
+  background: var(--marfil-claro);
+  border: 1px solid var(--filete);
+  border-left: 3px solid var(--rojo);
+  border-radius: 2px;
+  padding: 12px 16px;
+  font: 400 15px/1.4 "Inter", sans-serif;
+  color: var(--obsidiana);
+  text-align: left;
+  cursor: pointer;
+}
+.sugerencia:hover { border-color: var(--obsidiana); border-left-color: var(--rojo); }
+
+.mensaje { display: flex; gap: 12px; }
+.mensaje.usuario { justify-content: flex-end; }
+.mensaje .burbuja { max-width: 100%; overflow-wrap: anywhere; }
+.mensaje.usuario .burbuja {
+  max-width: 82%;
+  background: var(--obsidiana);
+  color: var(--marfil);
+  padding: 10px 16px;
+  border-radius: 2px;
+  white-space: pre-wrap;
+}
+.mensaje.agente .burbuja { border-left: 2px solid var(--rojo); padding: 2px 0 2px 14px; }
+.mensaje.agente .burbuja > :first-child { margin-top: 0; }
+.mensaje.agente .burbuja > :last-child { margin-bottom: 0; }
+.burbuja p { margin: 0 0 10px; }
+.burbuja .subtitulo { font-weight: 600; }
+.burbuja ul, .burbuja ol { margin: 0 0 10px; padding-left: 22px; }
+.burbuja li { margin-bottom: 4px; }
+.burbuja code { background: rgba(20,20,20,0.07); padding: 1px 5px; border-radius: 2px; font-size: 0.92em; }
+.mensaje.error .burbuja { color: var(--rojo); font-weight: 500; }
+
+/* Carga: el rombo rojo se llena de abajo hacia arriba mientras llega la respuesta. */
+.cargando { display: block; width: 24px; height: 32px; }
+.cargando .relleno { transform-box: fill-box; transform-origin: bottom; animation: llenar 1.6s ease-in-out infinite; }
+@keyframes llenar { 0% { transform: scaleY(0); } 70%, 100% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .cargando .relleno { animation: none; transform: scaleY(0.6); } }
+
+/* ---------- Escritura ---------- */
+.escritura { flex: none; border-top: 1px solid var(--filete); background: var(--marfil); }
+.escritura-interior { max-width: var(--ancho); margin: 0 auto; padding: 16px 16px 12px; }
+.campo {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  background: var(--marfil-claro);
+  border: 1px solid var(--obsidiana);
+  border-radius: 2px;
+  padding: 8px;
+}
+.campo:focus-within { outline: 2px solid var(--rojo); outline-offset: 2px; }
+.campo textarea {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  resize: none;
+  font: 400 15px/1.5 "Inter", sans-serif;
+  color: var(--obsidiana);
+  padding: 6px 8px;
+  max-height: 160px;
+  outline: none;
+}
+.campo textarea::placeholder { color: var(--piedra); }
+.enviar {
+  flex: none;
+  width: 40px; height: 40px;
+  background: var(--obsidiana);
+  color: var(--marfil);
+  border: 0;
+  border-radius: 2px;
+  cursor: pointer;
+  display: grid; place-items: center;
+}
+.enviar:hover:not(:disabled) { background: var(--rojo); }
+.enviar:disabled { opacity: 0.35; cursor: not-allowed; }
+.enviar svg { width: 18px; height: 18px; }
+
+@media (max-width: 520px) {
+  .bienvenida h1 { font-size: 26px; }
+  .mensaje.usuario .burbuja { max-width: 92%; }
+  .solo-escritorio { display: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="encabezado">
+  <div class="encabezado-interior">
+    <p class="titulo-app">Viáticos</p>
+    <button class="boton-texto" id="nueva" type="button" aria-label="Nueva conversación">Nueva<span class="solo-escritorio"> conversación</span></button>
+  </div>
+</header>
+
+<main class="conversacion" id="conversacion">
+  <div class="conversacion-interior" id="mensajes" aria-live="polite">
+    <section class="bienvenida" id="bienvenida">
+      <h1>Asistente de viáticos</h1>
+      <p class="lema">Tus viáticos, claros desde la primera pregunta.</p>
+      <p>Consulta cuánto te corresponde de alimentación y hotel, y cómo calcular tu viaje.</p>
+      <div class="sugerencias">
+        <button class="sugerencia" type="button">¿Cuánto me reembolsan de alimentación por día?</button>
+        <button class="sugerencia" type="button">¿Hasta cuánto puedo pagar por una noche de hotel?</button>
+        <button class="sugerencia" type="button">¿Cuántos días tengo para pedir el reembolso?</button>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="escritura">
+  <form class="escritura-interior" id="formulario" autocomplete="off">
+    <div class="campo">
+      <label for="entrada" hidden>Tu pregunta</label>
+      <textarea id="entrada" rows="1" maxlength="2000" placeholder="Escribe tu pregunta sobre viáticos…"></textarea>
+      <button class="enviar" id="enviar" type="submit" aria-label="Enviar" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M12 20V5M5 12l7-7 7 7"/></svg>
+      </button>
+    </div>
+  </form>
+</footer>
+
+<template id="tpl-cargando">
+  <svg class="cargando" viewBox="0 0 24 32" role="img" aria-label="Consultando">
+    <defs><clipPath id="forma"><path d="M12 1.5L22 16 12 30.5 2 16z"/></clipPath></defs>
+    <rect class="relleno" x="0" y="0" width="24" height="32" fill="#9B1C1F" clip-path="url(#forma)"/>
+    <path d="M12 1.5L22 16 12 30.5 2 16z" fill="none" stroke="#9B1C1F" stroke-width="1.5" stroke-linejoin="miter"/>
+  </svg>
+</template>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const mensajes = $("#mensajes"), conversacion = $("#conversacion");
+const entrada = $("#entrada"), botonEnviar = $("#enviar");
+let interaccionId = null;
+let enviando = false;
+
+function esc(t) {
+  return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function enLinea(t) {
+  return esc(t)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1<em>$2</em>");
+}
+// Markdown mínimo (títulos, listas, negritas). Todo el texto se escapa antes.
+function md(texto) {
+  let html = "", lista = null, parrafo = [];
+  const volcar = () => { if (parrafo.length) { html += "<p>" + parrafo.map(enLinea).join("<br>") + "</p>"; parrafo = []; } };
+  const cerrar = () => { if (lista) { html += `</${lista}>`; lista = null; } };
+  const item = (tipo, contenido) => {
+    volcar();
+    if (lista !== tipo) { cerrar(); html += `<${tipo}>`; lista = tipo; }
+    html += "<li>" + enLinea(contenido) + "</li>";
+  };
+  for (const l of texto.split("\n")) {
+    let m;
+    if (!l.trim()) { volcar(); cerrar(); }
+    else if ((m = l.match(/^\s*[-*•]\s+(.*)/))) item("ul", m[1]);
+    else if ((m = l.match(/^\s*\d+[.)]\s+(.*)/))) item("ol", m[1]);
+    else if ((m = l.match(/^#{1,6}\s+(.*)/))) { volcar(); cerrar(); html += '<p class="subtitulo">' + enLinea(m[1]) + "</p>"; }
+    else { cerrar(); parrafo.push(l); }
+  }
+  volcar(); cerrar();
+  return html;
+}
+
+function agregar(tipo, contenido, esHtml) {
+  const fila = document.createElement("div");
+  fila.className = "mensaje " + tipo;
+  const burbuja = document.createElement("div");
+  burbuja.className = "burbuja";
+  if (esHtml) burbuja.innerHTML = contenido; else burbuja.textContent = contenido;
+  fila.appendChild(burbuja);
+  mensajes.appendChild(fila);
+  conversacion.scrollTop = conversacion.scrollHeight;
+  return fila;
+}
+
+function actualizarBoton() {
+  botonEnviar.disabled = enviando || !entrada.value.trim();
+}
+function ajustarAltura() {
+  entrada.style.height = "auto";
+  entrada.style.height = Math.min(entrada.scrollHeight, 160) + "px";
+}
+
+async function enviar(texto) {
+  texto = texto.trim();
+  if (!texto || enviando) return;
+  enviando = true;
+  const bienvenida = $("#bienvenida");
+  if (bienvenida) bienvenida.remove();
+  const turnoUsuario = agregar("usuario", texto);
+  entrada.value = "";
+  ajustarAltura();
+  actualizarBoton();
+
+  const espera = agregar("agente", "", false);
+  espera.querySelector(".burbuja").appendChild($("#tpl-cargando").content.cloneNode(true));
+  conversacion.scrollTop = conversacion.scrollHeight;
+
+  try {
+    const r = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mensaje: texto, interaccion_id: interaccionId }),
+    });
+    const datos = await r.json();
+    espera.remove();
+    if (!r.ok) throw new Error(datos.error || "Algo salió mal.");
+    interaccionId = datos.interaccion_id;
+    agregar("agente", datos.respuesta ? md(datos.respuesta) : "No recibí respuesta. Intenta de nuevo.", true);
+  } catch (e) {
+    espera.remove();
+    turnoUsuario.remove();
+    agregar("agente error", e.message || "No pude conectar con el servidor.");
+    entrada.value = texto;
+    ajustarAltura();
+  } finally {
+    enviando = false;
+    actualizarBoton();
+    entrada.focus();
+  }
+}
+
+$("#formulario").addEventListener("submit", (e) => { e.preventDefault(); enviar(entrada.value); });
+entrada.addEventListener("input", () => { ajustarAltura(); actualizarBoton(); });
+entrada.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviar(entrada.value); }
+});
+document.querySelectorAll(".sugerencia").forEach((b) => b.addEventListener("click", () => enviar(b.textContent)));
+$("#nueva").addEventListener("click", () => location.reload());
+entrada.focus();
+</script>
+</body>
+</html>

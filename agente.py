@@ -1,10 +1,25 @@
 import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
 from google import genai
 
 MODELO = "gemini-3.5-flash-lite"
-INSTRUCCIONES = "Responde como cavernicola."
+RAIZ = Path(__file__).parent
+RUTA_SISTEMA = RAIZ / "Prompts" / "sistema.md"
+CARPETA_CONOCIMIENTO = RAIZ / "Conocimiento"
+
+
+def cargar_documentos():
+    documentos = []
+    for ruta in sorted(CARPETA_CONOCIMIENTO.iterdir()):
+        if ruta.is_file():
+            contenido = ruta.read_text(encoding="utf-8")
+            documentos.append(f'<documento nombre="{ruta.name}">\n{contenido}\n</documento>')
+    return "\n\n".join(documentos)
+
+
+INSTRUCCIONES = RUTA_SISTEMA.read_text(encoding="utf-8") + "\n\n" + cargar_documentos()
 
 load_dotenv()
 client = genai.Client()

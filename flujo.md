@@ -1,0 +1,5 @@
+cuanto puedo gastar en viaticos del minibar? (politica_viaticos)
+Que hago si perdi una factura? (preguntas_frecuentes)
+En cuanto tiempo me reembolsan los viaticos (politica_viaticos)
+Cual es el tope de dinero que repone la compañia por dia? (politica_viaticos)
+puedo pedir dinero antes de viajar? (preguntas_frecuentes)
