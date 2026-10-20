@@ -1,30 +1,18 @@
 import threading
 import webbrowser
-from pathlib import Path
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from google import genai
 
-MODELO = "gemini-3.5-flash-lite"
-RUTA_INSTRUCCIONES = Path(__file__).parent / "Prompts" / "sistema.md"
+from agente import HERRAMIENTAS, MODELO, cargar_instrucciones, ejecutar_herramientas
+
 PUERTO = 8000
-CARPETA_CONOCIMIENTO = Path(__file__).parent / "Conocimiento"
 MAX_CARACTERES = 2000
 
 load_dotenv()
 client = genai.Client()
 app = Flask(__name__, static_folder="static", static_url_path="/static")
-
-
-def cargar_instrucciones():
-    documentos = []
-    for ruta in sorted(CARPETA_CONOCIMIENTO.iterdir()):
-        if ruta.is_file():
-            contenido = ruta.read_text(encoding="utf-8")
-            documentos.append(f'<documento nombre="{ruta.name}">\n{contenido}\n</documento>')
-    base = RUTA_INSTRUCCIONES.read_text(encoding="utf-8")
-    return base + "\n\n" + "\n\n".join(documentos)
 
 
 @app.get("/")
@@ -48,8 +36,10 @@ def chat():
             model=MODELO,
             system_instruction=instrucciones,
             input=mensaje,
+            tools=HERRAMIENTAS,
             previous_interaction_id=datos.get("interaccion_id") or None,
         )
+        interaccion = ejecutar_herramientas(client, interaccion, instrucciones)
     except Exception as error:
         app.logger.exception("Falló la llamada a Gemini")
         return jsonify(error=f"No pude obtener respuesta ({type(error).__name__})."), 502
