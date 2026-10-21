@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from google import genai
 
-from agente import HERRAMIENTAS, MODELO, cargar_instrucciones, ejecutar_herramientas
+from agente import HERRAMIENTAS, MODELO, armar_respuesta, cargar_instrucciones, ejecutar_herramientas
 
 PUERTO = 8000
 MAX_CARACTERES = 2000
@@ -39,12 +39,17 @@ def chat():
             tools=HERRAMIENTAS,
             previous_interaction_id=datos.get("interaccion_id") or None,
         )
-        interaccion = ejecutar_herramientas(client, interaccion, instrucciones)
+        informes, pasos = [], []
+        interaccion = ejecutar_herramientas(client, interaccion, instrucciones, informes, pasos)
     except Exception as error:
         app.logger.exception("Falló la llamada a Gemini")
         return jsonify(error=f"No pude obtener respuesta ({type(error).__name__})."), 502
 
-    return jsonify(respuesta=interaccion.output_text or "", interaccion_id=interaccion.id)
+    return jsonify(
+        respuesta=armar_respuesta(interaccion, informes),
+        pasos=pasos,
+        interaccion_id=interaccion.id,
+    )
 
 
 if __name__ == "__main__":

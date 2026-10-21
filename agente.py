@@ -1,5 +1,7 @@
 import csv
 import json
+import os
+import subprocess
 import sys
 import unicodedata
 from datetime import date
@@ -14,6 +16,8 @@ RUTA_SISTEMA = RAIZ / "Prompts" / "sistema.md"
 CARPETA_CONOCIMIENTO = RAIZ / "Conocimiento"
 RUTA_GASTOS = CARPETA_CONOCIMIENTO / "gastos.csv"
 RUTA_SOLICITUDES = RAIZ / "solicitudes.csv"
+CARPETA_SKILLS = RAIZ / ".claude" / "skills"
+TIEMPO_MAX_SCRIPT = 60
 CAMPOS_SOLICITUD = [
     "radicado", "fecha_registro", "empleado", "ciudad",
     "fecha_salida", "noches", "motivo", "estado",
@@ -73,9 +77,76 @@ def registrar_solicitud(empleado, ciudad, fecha_salida, noches, motivo):
     return {"radicado": radicado}
 
 
+def leer_encabezado_skill(ruta):
+    """Devuelve los campos clave: valor del encabezado (entre ---) de un SKILL.md."""
+    lineas = ruta.read_text(encoding="utf-8").splitlines()
+    campos = {}
+    if not lineas or lineas[0].strip() != "---":
+        return campos
+    for linea in lineas[1:]:
+        if linea.strip() == "---":
+            break
+        clave, separador, valor = linea.partition(":")
+        if separador:
+            campos[clave.strip()] = valor.strip().strip("\"'")
+    return campos
+
+
+def listar_skills():
+    """Devuelve {nombre: {"descripcion": ..., "carpeta": ...}} de .claude/skills/*/SKILL.md."""
+    skills = {}
+    for ruta in sorted(CARPETA_SKILLS.glob("*/SKILL.md")):
+        encabezado = leer_encabezado_skill(ruta)
+        nombre = encabezado.get("name") or ruta.parent.name
+        skills[nombre] = {
+            "descripcion": encabezado.get("description", ""),
+            "carpeta": ruta.parent,
+        }
+    return skills
+
+
+def cargar_skill(nombre):
+    skills = listar_skills()
+    if nombre not in skills:
+        return {"error": f"No existe la skill '{nombre}'. Disponibles: {', '.join(skills) or 'ninguna'}."}
+    print(f"[skill] cargando {nombre} ...")
+    contenido = (skills[nombre]["carpeta"] / "SKILL.md").read_text(encoding="utf-8")
+    return {"contenido": contenido}
+
+
+def ejecutar_script(skill, script, argumento=None):
+    skills = listar_skills()
+    if skill not in skills:
+        return {"error": f"No existe la skill '{skill}'. Disponibles: {', '.join(skills) or 'ninguna'}."}
+
+    carpeta_scripts = (skills[skill]["carpeta"] / "scripts").resolve()
+    ruta = (carpeta_scripts / script).resolve()
+    if not ruta.is_relative_to(carpeta_scripts):
+        return {"error": f"Rechazado: '{script}' está fuera de la carpeta scripts/ de la skill '{skill}'."}
+    if ruta.suffix != ".py" or not ruta.is_file():
+        return {"error": f"No existe el script Python '{script}' en scripts/ de la skill '{skill}'."}
+
+    comando = [sys.executable, str(ruta)]
+    if argumento:
+        comando.append(str(argumento))
+    print(f"[script] ejecutando {skill}/scripts/{ruta.relative_to(carpeta_scripts).as_posix()} ...")
+    try:
+        proceso = subprocess.run(
+            comando, cwd=RAIZ, capture_output=True, text=True, encoding="utf-8",
+            timeout=TIEMPO_MAX_SCRIPT, env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+        )
+    except subprocess.TimeoutExpired:
+        return {"error": f"El script superó los {TIEMPO_MAX_SCRIPT} segundos y se detuvo."}
+    if proceso.returncode != 0:
+        return {"error": proceso.stderr.strip() or f"El script terminó con código {proceso.returncode}."}
+    return {"salida": proceso.stdout}
+
+
 FUNCIONES = {
     "sumar_gastos": sumar_gastos,
     "registrar_solicitud": registrar_solicitud,
+    "cargar_skill": cargar_skill,
+    "ejecutar_script": ejecutar_script,
 }
 
 HERRAMIENTAS = [
@@ -130,17 +201,103 @@ HERRAMIENTAS = [
             "required": ["empleado", "ciudad", "fecha_salida", "noches", "motivo"],
         },
     },
+    {
+        "type": "function",
+        "name": "cargar_skill",
+        "description": (
+            "Devuelve el contenido completo del SKILL.md de una skill, con sus pasos e "
+            "instrucciones. Debes llamarla antes de usar cualquier skill de la lista."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "nombre": {"type": "string", "description": "Nombre de la skill, tal como aparece en la lista."},
+            },
+            "required": ["nombre"],
+        },
+    },
+    {
+        "type": "function",
+        "name": "ejecutar_script",
+        "description": (
+            "Ejecuta con Python un script de la carpeta scripts/ de una skill y devuelve lo que "
+            "imprime. Solo funciona con scripts de esa carpeta. Úsala después de cargar la skill, "
+            "con el script y el argumento que indique su SKILL.md."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "skill": {"type": "string", "description": "Nombre de la skill dueña del script."},
+                "script": {"type": "string", "description": "Nombre del script dentro de scripts/, por ejemplo validar.py."},
+                "argumento": {
+                    "type": "string",
+                    "description": "Argumento para el script, por ejemplo la ruta de un CSV. Omítelo si no lo necesita.",
+                },
+            },
+            "required": ["skill", "script"],
+        },
+    },
 ]
 
+
+def texto_skills():
+    skills = listar_skills()
+    if not skills:
+        return ""
+    lista = "\n".join(f"- {nombre}: {datos['descripcion']}" for nombre, datos in skills.items())
+    return (
+        "<skills>\n"
+        "Además de los documentos, tienes estas skills:\n"
+        f"{lista}\n\n"
+        "Antes de usar una skill debes cargarla con la herramienta cargar_skill y seguir sus "
+        "instrucciones; sus scripts se ejecutan con ejecutar_script. Cuando uses una skill, el "
+        "formato de esa skill reemplaza al de <formato>, y la regla 1 no te impide usar lo que la skill y sus scripts entreguen.\n"
+        "</skills>"
+    )
+
+
 def cargar_instrucciones():
-    return RUTA_SISTEMA.read_text(encoding="utf-8") + "\n\n" + cargar_documentos()
+    partes = [RUTA_SISTEMA.read_text(encoding="utf-8"), cargar_documentos(), texto_skills()]
+    return "\n\n".join(parte for parte in partes if parte)
 
 
 def llamadas_pendientes(interaccion):
     return [paso for paso in interaccion.steps or [] if paso.type == "function_call"]
 
 
-def ejecutar_herramientas(client, interaccion, instrucciones):
+AVISO_INFORME = (
+    "Este informe se mostrará al usuario tal cual, antes de tu respuesta. No lo copies, no lo "
+    "resumas ni repitas sus cifras: escribe solo lo que el SKILL.md pide después del informe."
+)
+
+
+def armar_respuesta(interaccion, informes):
+    """Pone la salida literal de los scripts antes del texto del modelo."""
+    return "\n\n".join([*informes, interaccion.output_text or ""]).strip()
+
+
+def describir_paso(llamada, resultado):
+    """Resume una llamada a herramienta como {"tipo", "texto", "error"} para mostrarla en la interfaz."""
+    args = llamada.arguments or {}
+    if llamada.name == "cargar_skill":
+        tipo, texto = "skill", f"Cargó la skill {args.get('nombre')}"
+    elif llamada.name == "ejecutar_script":
+        partes = [f"{args.get('skill')}/scripts/{args.get('script')}", args.get("argumento")]
+        tipo, texto = "script", "Ejecutó el script " + " ".join(p for p in partes if p)
+    else:
+        detalle = ", ".join(f"{k}={v}" for k, v in args.items())
+        tipo, texto = "herramienta", f"Usó {llamada.name}" + (f" ({detalle})" if detalle else "")
+    error = resultado.get("error") if isinstance(resultado, dict) else None
+    return {"tipo": tipo, "texto": texto, "error": error}
+
+
+def ejecutar_herramientas(client, interaccion, instrucciones, informes=None, pasos=None):
+    """Atiende las herramientas hasta que el modelo responda con texto.
+
+    Si se pasa una lista en `informes`, se llena con la salida de cada ejecutar_script
+    exitoso; el llamador la muestra con armar_respuesta para que ninguna cifra pase por el modelo.
+    Si se pasa una lista en `pasos`, se llena con un resumen de cada herramienta usada.
+    """
     for _ in range(MAX_VUELTAS):
         llamadas = llamadas_pendientes(interaccion)
         if not llamadas:
@@ -153,11 +310,17 @@ def ejecutar_herramientas(client, interaccion, instrucciones):
             except Exception as error:
                 resultado = {"error": f"{type(error).__name__}: {error}"}
             print(f"[herramienta] {llamada.name}({llamada.arguments}) -> {resultado}")
+            if pasos is not None:
+                pasos.append(describir_paso(llamada, resultado))
+            para_modelo = resultado
+            if informes is not None and llamada.name == "ejecutar_script" and "salida" in resultado:
+                informes.append(resultado["salida"].strip())
+                para_modelo = {"informe": resultado["salida"], "aviso": AVISO_INFORME}
             resultados.append({
                 "type": "function_result",
                 "name": llamada.name,
                 "call_id": llamada.id,
-                "result": [{"type": "text", "text": json.dumps(resultado, ensure_ascii=False)}],
+                "result": [{"type": "text", "text": json.dumps(para_modelo, ensure_ascii=False)}],
             })
 
         interaccion = client.interactions.create(
@@ -187,10 +350,12 @@ def main():
         input=" ".join(sys.argv[1:]),
         tools=HERRAMIENTAS,
     )
-    interaccion = ejecutar_herramientas(client, interaccion, instrucciones)
+    informes = []
+    interaccion = ejecutar_herramientas(client, interaccion, instrucciones, informes)
 
-    if interaccion.output_text:
-        print(interaccion.output_text)
+    respuesta = armar_respuesta(interaccion, informes)
+    if respuesta:
+        print(respuesta)
     else:
         pasos = [paso.type for paso in interaccion.steps or []]
         print(f"[aviso] El modelo no devolvió texto (estado: {interaccion.status}, pasos: {pasos}).")

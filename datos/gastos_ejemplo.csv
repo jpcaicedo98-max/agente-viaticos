@@ -1,0 +1,6 @@
+legalizacion,empleado,ciudad,salida,regreso,id,fecha,categoria,descripcion,factura,valor_cop
+L-9001,Camila Restrepo,Medellín,2026-10-12,2026-10-14,G-901,2026-10-12,Tiquetes aéreos,Tiquete ida y vuelta a Medellín,FE-70112,485000
+L-9001,Camila Restrepo,Medellín,2026-10-12,2026-10-14,G-902,2026-10-12,Hospedaje,Noche de hotel en Medellín,FE-62240,295000
+L-9001,Camila Restrepo,Medellín,2026-10-12,2026-10-14,G-903,2026-10-13,Alimentación,Almuerzo y cena,FE-41876,84000
+L-9001,Camila Restrepo,Medellín,2026-10-12,2026-10-14,G-904,2026-10-13,Transporte local,Taxi aeropuerto - hotel,FE-19355,52000
+L-9001,Camila Restrepo,Medellín,2026-10-12,2026-10-14,G-905,2026-10-14,Alimentación,Desayuno y almuerzo,FE-41903,46500
